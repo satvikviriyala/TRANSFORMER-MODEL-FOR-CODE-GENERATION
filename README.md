@@ -59,7 +59,4 @@ This project details the development of a specialized Large Language Model (LLM)
 *   `requirements.txt`: Python dependencies.
 *   `README.md`: This file.
 
-**Setup & Usage:** (Detailed instructions in the full guide below or linked documentation)
 
-**(Link to Full Guide/Documentation)**
-**(Link to Model Checkpoints if available)**
