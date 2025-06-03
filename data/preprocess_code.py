@@ -27,7 +27,12 @@ def load_and_tokenize_data():
         logger.error(f"Tokenizer file not found at {tokenizer_path}. Run tokenizer training first.")
         return
     # Load custom tokenizer
-    tokenizer = Tokenizer.from_file(tokenizer_path)
+    try:
+        tokenizer = Tokenizer.from_file(tokenizer_path)
+        logger.info(f"Successfully loaded tokenizer from {tokenizer_path}")
+    except Exception as e:
+        logger.error(f"Failed to load tokenizer from {tokenizer_path}: {e}", exc_info=True)
+        return
     # Or load from HF Hub if applicable
     # tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 

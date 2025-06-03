@@ -16,6 +16,8 @@ from src.utils.logging_utils import setup_logger
 # For simplicity, this example assumes single GPU or uses accelerate/Trainer later.
 # To adapt for DDP: Add DDP setup/cleanup, DistributedSampler, wrap model with DDP.
 
+from src.model.transformer import CustomTransformerLM # Added import
+
 # --- Config & Setup ---
 config = load_config()
 model_cfg = config['model'] # Base model config
@@ -37,22 +39,41 @@ def finetune():
     # --- Load Tokenizer ---
     tokenizer_path = os.getenv("TOKENIZER_PATH")
     logger.info(f"Loading tokenizer from {tokenizer_path}")
-    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-    tokenizer = Tokenizer.from_file(tokenizer_path)
+    # tokenizer = AutoTokenizer.from_pretrained(tokenizer_path) # Alternative if tokenizer is HF compatible
+    tokenizer = Tokenizer.from_file(tokenizer_path) # Load custom trained tokenizer
+    # Add PAD token if it doesn't exist. This is crucial for padding batches.
     if tokenizer.token_to_id("[PAD]") is None:
         tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-        # Resize model embeddings if needed after adding tokens (if loading base model state_dict directly)
+        logger.info("Added [PAD] token to tokenizer for fine-tuning.")
+        # IMPORTANT: If new tokens are added to the tokenizer, the base model's embedding layer
+        # might need to be resized *before* loading the state_dict if the `vocab_size` in `model_cfg`
+        # doesn't reflect this. However, for LoRA, we typically freeze base model weights,
+        # so resizing embeddings is less common unless the base model itself is also being updated.
+        # Here, we assume `model_cfg['vocab_size']` (used for CustomTransformerLM instantiation)
+        # is consistent with the pre-trained model's vocabulary.
     pad_token_id = tokenizer.token_to_id("[PAD]")
 
+
     # --- Load Base Model ---
-    base_model_path = ft_cfg['base_model_path']
-    logger.info(f"Loading base model from {base_model_path}")
-    # Option A: Load custom model state dict
-    from src.model.transformer import DummyTransformer # Replace with actual
-    base_model = DummyTransformer(model_cfg) # Initialize with config used for pretraining
-    state_dict_path = os.path.join(base_model_path, "pytorch_model.bin")
-    base_model.load_state_dict(torch.load(state_dict_path, map_location="cpu")) # Load to CPU first
-    logger.info("Loaded base model state_dict.")
+    base_model_path = ft_cfg['base_model_path'] # Path to the pre-trained model checkpoint
+    logger.info(f"Loading base model from: {base_model_path}")
+
+    # It is CRITICAL that the `model_cfg` used here to instantiate `CustomTransformerLM`
+    # matches the configuration of the pre-trained model in `base_model_path`.
+    # This includes `embed_dim`, `n_layers`, `n_heads`, and especially `vocab_size`.
+    # Ideally, `model_cfg` should be loaded from a 'model_config.yaml' saved with the pre-trained checkpoint.
+    # Using the global `model_cfg` assumes it's consistent with the checkpoint.
+    # If `tokenizer.add_special_tokens` modified the vocab size, and `model_cfg['vocab_size']`
+    # isn't updated accordingly before this step, it can lead to size mismatches
+    # when loading the state_dict if the checkpoint was saved with a different vocab size.
+    # For this script, we rely on the `model_cfg` loaded from the main config file.
+    logger.info(f"Instantiating CustomTransformerLM with vocab_size: {model_cfg['vocab_size']}")
+    base_model = CustomTransformerLM(model_cfg) # Instantiate our custom model structure
+
+    state_dict_path = os.path.join(base_model_path, "pytorch_model.bin") # Path to the model's state dictionary
+    logger.info(f"Loading base model state_dict from: {state_dict_path}")
+    base_model.load_state_dict(torch.load(state_dict_path, map_location="cpu")) # Load weights to CPU first
+    logger.info("Successfully loaded base model state_dict into CustomTransformerLM.")
     # Option B: Load using Hugging Face AutoModel if saved in that format
     # base_model = AutoModelForCausalLM.from_pretrained(base_model_path)
 

@@ -1,63 +1,78 @@
-# Model Architecture
+# Global Model Architecture Configuration
+# These settings define the structure of the CustomTransformerLM model.
+# This section is referenced by pre-training, fine-tuning, and serving scripts.
+# IMPORTANT: When loading a pre-trained model, ensure these parameters (especially vocab_size,
+# embed_dim, n_layers, n_heads) match the configuration of the loaded checkpoint.
+# Ideally, a checkpoint should include its own specific model_config.yaml.
 model:
-  vocab_size: 32000       # Set based on trained tokenizer
-  seq_len: 512            # Max sequence length
-  embed_dim: 768          # Embedding dimension (d_model)
-  n_layers: 12            # Number of transformer blocks
-  n_heads: 12             # Number of attention heads
-  hidden_dim: 3072        # Dimension of feed-forward layer (often 4*embed_dim)
-  dropout: 0.1
-  # Add other params like layer_norm_eps if needed
+  vocab_size: 32000       # Vocabulary size. Determined by the trained tokenizer.
+                          # This value MUST be updated if the tokenizer's vocab size changes (e.g., after adding special tokens).
+  seq_len: 512            # Maximum sequence length the model can process.
+  embed_dim: 768          # Embedding dimension (often denoted as d_model).
+  n_layers: 12            # Number of Transformer blocks (layers) in the model.
+  n_heads: 12             # Number of attention heads in each MultiHeadAttention layer.
+                          # `embed_dim` must be divisible by `n_heads`.
+  hidden_dim: 3072        # Dimension of the inner feed-forward layer in Transformer blocks (often 4 * embed_dim).
+  dropout: 0.1            # Dropout probability applied in embeddings, attention, and feed-forward layers.
+  # activation_fn: "gelu" # Optional: Activation function for FFN, e.g., "gelu" or "relu". Defaults to "relu" in model.
+  # layer_norm_eps: 1.0e-5 # Optional: Epsilon for LayerNorm. Defaults to torch's LayerNorm default.
 
-# Tokenizer Config
+# Tokenizer Configuration
+# Settings for training a custom BPE tokenizer using `src/tokenizer/train_tokenizer.py`.
 tokenizer:
-  vocab_size: 32000       # Must match model.vocab_size
-  min_frequency: 2
-  special_tokens: ["[PAD]", "[UNK]", "[SOS]", "[EOS]", "[MASK]"] # Example
-  training_files_glob: "${RAW_DATA_DIR}/**/*.py" # Glob pattern for training files
+  vocab_size: 32000       # Target vocabulary size for the tokenizer. Should ideally match `model.vocab_size`
+                          # after tokenizer training and any special token additions.
+  min_frequency: 2        # Minimum frequency for a token to be included in the vocabulary.
+  special_tokens: ["[PAD]", "[UNK]", "[SOS]", "[EOS]", "[MASK]"] # List of special tokens to add to the tokenizer.
+                          # Ensure [PAD] is included if padding is used.
+  training_files_glob_relative: "**/*.py" # Glob pattern relative to RAW_DATA_DIR (set via .env)
+                                         # for finding training files (e.g., "**/*.py" for all Python files).
 
-# Pre-training Config
+# Pre-training Configuration (`src/training/pretrain_ddp.py`)
 pretrain:
-  data_path: "${PROCESSED_DATA_DIR}/pretrain_dataset" # Path to Hugging Face dataset dir
-  output_dir: "${PRETRAIN_OUTPUT_DIR}"
-  num_train_epochs: 3
-  per_device_train_batch_size: 8 # Adjust based on GPU memory
-  gradient_accumulation_steps: 4 # Effective batch size = batch_size * num_gpus * grad_accum
-  learning_rate: 5.0e-5
-  lr_scheduler_type: "cosine" # cosine, linear
-  warmup_steps: 500
-  weight_decay: 0.01
-  seed: 42
-  logging_steps: 100
-  save_steps: 1000 # Save checkpoints periodically
-  use_amp: true # Use Automatic Mixed Precision
+  data_path: "${PROCESSED_DATA_DIR}/pretrain_dataset" # Path to the processed Hugging Face dataset directory.
+  output_dir: "${PRETRAIN_OUTPUT_DIR}"               # Directory to save pre-trained model checkpoints and artifacts.
+  num_train_epochs: 3       # Total number of training epochs.
+  per_device_train_batch_size: 8 # Batch size per GPU. Effective batch size will be this * num_gpus * gradient_accumulation_steps.
+  gradient_accumulation_steps: 4 # Number of steps to accumulate gradients before an optimizer update.
+  learning_rate: 5.0e-5     # Peak learning rate for the optimizer.
+  lr_scheduler_type: "cosine" # Learning rate scheduler type (e.g., "cosine", "linear", "constant"). See Hugging Face docs.
+  warmup_steps: 500         # Number of warmup steps for the learning rate scheduler.
+  weight_decay: 0.01        # Weight decay for the AdamW optimizer.
+  seed: 42                  # Random seed for reproducibility.
+  logging_steps: 100        # Log training metrics every N global steps.
+  save_steps: 1000          # Save a model checkpoint every N global steps.
+  use_amp: true             # Whether to use Automatic Mixed Precision (AMP) for training (requires CUDA).
 
-# LoRA Fine-tuning Config
+# LoRA Fine-tuning Configuration (`src/training/finetune_lora.py`)
 finetune_lora:
-  base_model_path: "${PRETRAIN_OUTPUT_DIR}/best_checkpoint" # Path to load pre-trained model
-  data_path: "${FINETUNE_DATA_PATH}" # Path to fine-tuning data (e.g., jsonl)
-  output_dir: "${FINETUNE_OUTPUT_DIR}"
-  num_train_epochs: 5
-  per_device_train_batch_size: 4
-  gradient_accumulation_steps: 2
-  learning_rate: 3.0e-4 # Often higher for LoRA than pre-training
-  lr_scheduler_type: "linear"
-  warmup_steps: 100
-  seed: 43
-  logging_steps: 50
-  save_steps: 500
-  # LoRA specific config (passed to peft)
+  base_model_path: "${PRETRAIN_OUTPUT_DIR}/final_model" # Path to the pre-trained base model checkpoint directory.
+                                                       # This directory should contain 'pytorch_model.bin' and ideally 'model_config.yaml' and 'tokenizer.json'.
+  data_path: "${FINETUNE_DATA_PATH}" # Path to the fine-tuning dataset (e.g., a .jsonl file).
+  output_dir: "${FINETUNE_OUTPUT_DIR}" # Directory to save fine-tuned LoRA adapter weights.
+  num_train_epochs: 5       # Number of epochs for fine-tuning.
+  per_device_train_batch_size: 4 # Batch size per GPU for fine-tuning.
+  gradient_accumulation_steps: 2 # Gradient accumulation for fine-tuning.
+  learning_rate: 3.0e-4     # Learning rate for LoRA fine-tuning (often higher than pre-training).
+  lr_scheduler_type: "linear" # LR scheduler for fine-tuning.
+  warmup_steps: 100         # Warmup steps for fine-tuning LR.
+  seed: 43                  # Random seed for fine-tuning reproducibility.
+  logging_steps: 50         # Log fine-tuning metrics every N global steps.
+  save_steps: 500           # Save LoRA adapter checkpoint every N global steps.
+  # LoRA specific configuration (passed to PEFT `LoraConfig`)
   lora:
-    r: 8                # Rank of the update matrices
-    lora_alpha: 16      # Alpha scaling factor
-    target_modules: ["q_proj", "v_proj"] # Example: Target query/value in attention
-    lora_dropout: 0.05
-    bias: "none"        # "none", "all", or "lora_only"
+    r: 8                # Rank of the LoRA update matrices.
+    lora_alpha: 16      # LoRA scaling factor (alpha).
+    target_modules: ["q_proj", "v_proj"] # List of module names (strings) within CustomTransformerLM to apply LoRA to.
+                                         # Example targets query and value projection layers in MultiHeadAttention.
+                                         # Full names might be like 'transformer_blocks.0.self_attn.q_proj'.
+    lora_dropout: 0.05  # Dropout probability for LoRA layers.
+    bias: "none"        # Bias type for LoRA layers ("none", "all", or "lora_only").
 
-# Serving Config
+# Serving Configuration (`src/serving/api_llm.py` and `src/serving/inference_llm.py`)
 serving:
-  port: 8001 # Different port
-  host: "0.0.0.0"
-  max_new_tokens: 100
-  temperature: 0.7
-  top_k: 50
+  port: 8001                # Port for the FastAPI LLM service.
+  host: "0.0.0.0"           # Host address for the service.
+  max_new_tokens: 100       # Default maximum new tokens for generation in the API.
+  temperature: 0.7          # Default temperature for sampling in the API. (0.0 = greedy)
+  top_k: 50                 # Default top-k for sampling in the API.
