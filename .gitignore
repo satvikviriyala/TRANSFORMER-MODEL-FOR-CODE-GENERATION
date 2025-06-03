@@ -1,0 +1,39 @@
+# Environments
+venv/
+.env
+*.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Data / Models / Checkpoints (Local)
+data/raw_corpus/
+data/processed_data/
+data/simulated/ # From Project 1 if in same parent dir
+trained_tokenizer/
+checkpoints/
+model_artifacts/ # If copying locally before build
+
+# IDE / OS files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# MLflow local artifacts
+mlruns/
+.mlflow-cache/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test outputs
+htmlcov/
+.coverage
+pytest_cache/

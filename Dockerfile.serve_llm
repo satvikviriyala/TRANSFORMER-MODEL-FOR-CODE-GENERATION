@@ -1,0 +1,42 @@
+# Use a PyTorch base image with CUDA support matching your training environment
+# Example: PyTorch NGC container or official pytorch/pytorch image
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime # Adjust tags as needed
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI} \
+    TOKENIZER_PATH=/app/model_artifacts/tokenizer.json \
+    SERVING_MODEL_PATH=/app/model_artifacts/base_model \
+    SERVING_ADAPTER_PATH=/app/model_artifacts/lora_adapter \
+    TRANSFORMERS_CACHE=/app/.cache/huggingface # Cache inside container
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY ./src /app/src
+COPY ./configs /app/configs
+
+# --- Model Artifact Handling ---
+# Option 1: Copy artifacts directly into the image (simpler for fixed models)
+# Create directory for artifacts
+RUN mkdir -p /app/model_artifacts/base_model /app/model_artifacts/lora_adapter
+# COPY path/to/your/trained_tokenizer/tokenizer.json /app/model_artifacts/tokenizer.json
+# COPY path/to/your/checkpoints/pretrained/best_checkpoint/ /app/model_artifacts/base_model/
+# COPY path/to/your/checkpoints/finetuned_lora/ /app/model_artifacts/lora_adapter/
+
+# Option 2: Download artifacts at runtime (more flexible, requires network access)
+# The inference script currently loads from paths set by ENV VARS.
+# You could add an entrypoint script to download from S3/GCS/MLflow before starting Uvicorn.
+
+# Expose the port
+EXPOSE 8001
+
+# Command to run the application
+CMD ["uvicorn", "src.serving.api_llm:app", "--host", "0.0.0.0", "--port", "8001"]

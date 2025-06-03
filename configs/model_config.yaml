@@ -1,0 +1,63 @@
+# Model Architecture
+model:
+  vocab_size: 32000       # Set based on trained tokenizer
+  seq_len: 512            # Max sequence length
+  embed_dim: 768          # Embedding dimension (d_model)
+  n_layers: 12            # Number of transformer blocks
+  n_heads: 12             # Number of attention heads
+  hidden_dim: 3072        # Dimension of feed-forward layer (often 4*embed_dim)
+  dropout: 0.1
+  # Add other params like layer_norm_eps if needed
+
+# Tokenizer Config
+tokenizer:
+  vocab_size: 32000       # Must match model.vocab_size
+  min_frequency: 2
+  special_tokens: ["[PAD]", "[UNK]", "[SOS]", "[EOS]", "[MASK]"] # Example
+  training_files_glob: "${RAW_DATA_DIR}/**/*.py" # Glob pattern for training files
+
+# Pre-training Config
+pretrain:
+  data_path: "${PROCESSED_DATA_DIR}/pretrain_dataset" # Path to Hugging Face dataset dir
+  output_dir: "${PRETRAIN_OUTPUT_DIR}"
+  num_train_epochs: 3
+  per_device_train_batch_size: 8 # Adjust based on GPU memory
+  gradient_accumulation_steps: 4 # Effective batch size = batch_size * num_gpus * grad_accum
+  learning_rate: 5.0e-5
+  lr_scheduler_type: "cosine" # cosine, linear
+  warmup_steps: 500
+  weight_decay: 0.01
+  seed: 42
+  logging_steps: 100
+  save_steps: 1000 # Save checkpoints periodically
+  use_amp: true # Use Automatic Mixed Precision
+
+# LoRA Fine-tuning Config
+finetune_lora:
+  base_model_path: "${PRETRAIN_OUTPUT_DIR}/best_checkpoint" # Path to load pre-trained model
+  data_path: "${FINETUNE_DATA_PATH}" # Path to fine-tuning data (e.g., jsonl)
+  output_dir: "${FINETUNE_OUTPUT_DIR}"
+  num_train_epochs: 5
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 2
+  learning_rate: 3.0e-4 # Often higher for LoRA than pre-training
+  lr_scheduler_type: "linear"
+  warmup_steps: 100
+  seed: 43
+  logging_steps: 50
+  save_steps: 500
+  # LoRA specific config (passed to peft)
+  lora:
+    r: 8                # Rank of the update matrices
+    lora_alpha: 16      # Alpha scaling factor
+    target_modules: ["q_proj", "v_proj"] # Example: Target query/value in attention
+    lora_dropout: 0.05
+    bias: "none"        # "none", "all", or "lora_only"
+
+# Serving Config
+serving:
+  port: 8001 # Different port
+  host: "0.0.0.0"
+  max_new_tokens: 100
+  temperature: 0.7
+  top_k: 50

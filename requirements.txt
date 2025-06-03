@@ -1,0 +1,26 @@
+# Core ML & NLP
+torch==2.0.1 # Or latest stable with matching CUDA
+transformers==4.33.1 # For utilities, comparison, tokenizers
+tokenizers==0.14.0 # For custom tokenizer training
+datasets==2.14.5 # For handling data efficiently
+accelerate==0.22.0 # Helper for DDP and mixed precision
+peft==0.5.0 # For LoRA implementation
+
+# MLOps
+mlflow==2.6.0
+
+# Serving
+fastapi==0.103.1
+uvicorn[standard]==0.23.2
+
+# Utilities
+pyyaml==6.0.1
+python-dotenv==1.0.0
+numpy # Usually installed with torch/transformers
+scikit-learn # For evaluation metrics potentially
+nltk # For text processing if needed
+rouge_score # For summarization evaluation
+
+# Add if using specific hardware/optimizations
+# deepspeed
+# bitsandbytes
