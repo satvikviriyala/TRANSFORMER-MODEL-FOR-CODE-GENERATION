@@ -4,8 +4,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
 from tokenizers import Tokenizer
 from peft import PeftModel, PeftConfig # To load LoRA adapters
 import os
+import time # Added import, was missing from previous read_files but present in file
 from src.utils.config_loader import load_config
 from src.utils.logging_utils import setup_logger
+from src.model.transformer import CustomTransformerLM # Added import
 
 logger = setup_logger("LLMInferenceService")
 config = load_config()
@@ -42,11 +44,32 @@ class LLMGenerator:
         try:
             # Option A: Load custom model state dict
             # Need to instantiate the model class first
-            from src.model.transformer import DummyTransformer # Replace with actual
-            base_model = DummyTransformer(model_cfg) # Ensure config matches saved model
-            state_dict_path = os.path.join(self.base_model_path, "pytorch_model.bin")
-            base_model.load_state_dict(torch.load(state_dict_path, map_location="cpu"))
-            logger.info("Loaded base model state_dict.")
+            # from src.model.transformer import DummyTransformer # Replace with actual
+            # base_model = DummyTransformer(model_cfg) # Ensure config matches saved model
+
+            # CRITICAL: The `model_cfg` used to instantiate `CustomTransformerLM` must EXACTLY match
+            # the configuration of the model saved at `base_model_path`. This includes parameters like
+            # `vocab_size`, `embed_dim`, `n_layers`, `n_heads`, etc.
+            #
+            # Best Practice: Load `model_config.yaml` from the `base_model_path` directory
+            # (if saved there during training, e.g., by `pretrain_ddp.py`) and use that specific config.
+            # `global_model_cfg = load_config()['model']` might not be the correct one if multiple model
+            # versions or configurations exist.
+            #
+            # The `tokenizer` loaded by `_load_tokenizer` might also have its vocab_size adjusted
+            # (e.g., by adding special tokens). If `model_cfg['vocab_size']` doesn't reflect the
+            # tokenizer's actual vocab size that the model was trained with, it will cause a mismatch
+            # with the embedding layer's dimensions when loading the `state_dict`.
+            #
+            # For this implementation, we are using the globally loaded `model_cfg`.
+            # Ensure this global `model_cfg` is appropriate for the specific checkpoint being loaded.
+            logger.info(f"Instantiating CustomTransformerLM with model_cfg (vocab_size: {model_cfg.get('vocab_size')}). Ensure this matches the checkpoint.")
+            base_model = CustomTransformerLM(model_cfg) # Instantiate our custom model structure
+
+            state_dict_path = os.path.join(self.base_model_path, "pytorch_model.bin") # Path to the model's weights
+            logger.info(f"Loading base model state_dict from: {state_dict_path}")
+            base_model.load_state_dict(torch.load(state_dict_path, map_location="cpu")) # Load weights to CPU first
+            logger.info("Successfully loaded base model state_dict into CustomTransformerLM.")
 
             # Option B: Load HF model
             # base_model = AutoModelForCausalLM.from_pretrained(self.base_model_path)

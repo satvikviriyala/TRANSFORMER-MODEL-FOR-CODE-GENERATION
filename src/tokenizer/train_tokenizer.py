@@ -35,16 +35,25 @@ def train_tokenizer():
     )
 
     # Find training files
-    files_pattern = tok_cfg['training_files_glob']
+    # files_pattern = tok_cfg['training_files_glob']
+    raw_data_dir_path = os.getenv("RAW_DATA_DIR", "data/raw_corpus/") # Default if not set
+    if not os.path.exists(raw_data_dir_path):
+        logger.error(f"RAW_DATA_DIR path does not exist: {raw_data_dir_path}. Please set it in .env or environment.")
+        return
+    files_pattern = os.path.join(raw_data_dir_path, tok_cfg['training_files_glob_relative'])
     files = glob.glob(files_pattern, recursive=True)
     if not files:
         logger.error(f"No files found matching pattern: {files_pattern}")
         return
-    logger.info(f"Found {len(files)} files for training.")
+    logger.info(f"Found {len(files)} files for training from pattern: {files_pattern}")
 
     # Train the tokenizer
-    tokenizer.train(files, trainer)
-    logger.info("Tokenizer training complete.")
+    try:
+        tokenizer.train(files, trainer)
+        logger.info("Tokenizer training complete.")
+    except Exception as e:
+        logger.error(f"Tokenizer training failed: {e}", exc_info=True)
+        return # Or raise
 
     # Save the tokenizer
     output_dir = os.path.dirname(output_path)
