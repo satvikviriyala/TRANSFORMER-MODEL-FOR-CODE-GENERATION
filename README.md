@@ -59,4 +59,130 @@ This project details the development of a specialized Large Language Model (LLM)
 *   `requirements.txt`: Python dependencies.
 *   `README.md`: This file.
 
+# Code Generation Transformer Model
+
+A transformer-based model for code generation, built with PyTorch and Hugging Face Transformers.
+
+## Features
+
+- Custom transformer architecture optimized for code generation
+- LoRA fine-tuning support
+- Distributed training with DDP
+- FastAPI-based serving
+- MLflow experiment tracking
+- Prometheus metrics and Grafana dashboards
+- Comprehensive testing and development tools
+
+## Project Structure
+
+```
+.
+├── configs/                 # Configuration files
+│   └── default_config.yaml
+├── data/                   # Data directory
+├── models/                 # Saved model checkpoints
+├── scripts/               # Utility scripts
+├── src/                   # Source code
+│   ├── model/            # Model implementation
+│   ├── training/         # Training scripts
+│   ├── serving/          # API serving
+│   └── utils/            # Utilities
+├── tests/                # Test files
+├── .pre-commit-config.yaml
+├── docker-compose.yml
+├── Dockerfile.serve_llm
+├── pyproject.toml
+├── requirements.txt
+└── README.md
+```
+
+## Setup
+
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+.\venv\Scripts\activate  # Windows
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Install pre-commit hooks:
+```bash
+pre-commit install
+```
+
+## Development
+
+1. Run tests:
+```bash
+pytest
+```
+
+2. Format code:
+```bash
+black src tests
+isort src tests
+```
+
+3. Type checking:
+```bash
+mypy src
+```
+
+## Training
+
+1. Prepare your data in the `data` directory
+2. Configure training parameters in `configs/default_config.yaml`
+3. Run training:
+```bash
+python src/training/pretrain_ddp.py
+```
+
+For LoRA fine-tuning:
+```bash
+python src/training/finetune_lora.py
+```
+
+## Serving
+
+1. Build and start the services:
+```bash
+docker-compose up -d
+```
+
+This will start:
+- API server on port 8000
+- MLflow on port 5000
+- Prometheus on port 9090
+- Grafana on port 3000
+
+2. Access the services:
+- API: http://localhost:8000
+- MLflow: http://localhost:5000
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+## Monitoring
+
+- View training metrics in MLflow
+- Monitor API performance in Grafana
+- Check system metrics in Prometheus
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
 
